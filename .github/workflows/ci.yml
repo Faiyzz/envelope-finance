@@ -1,0 +1,97 @@
+name: CI
+on:
+  push: { branches: [main] }
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Dummy values: build/typecheck never connects; tests use TEST_DATABASE_URL
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+  DATABASE_URL_UNPOOLED: postgresql://postgres:postgres@localhost:5432/postgres
+  AUTH_SECRET: ci-secret-ci-secret-ci-secret-ci-secret-1234
+  AUTH_URL: http://localhost:3000
+  CRON_SECRET: ci-cron-secret-ci-cron-secret-ci-cron-1234
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run format:check
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env: { GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
+      - run: npm audit --omit=dev --audit-level=high
+
+  unit:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: { tz: [Asia/Karachi, UTC, America/Los_Angeles, Pacific/Auckland] } # dates must not depend on the host zone
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx vitest run tests/unit --coverage
+        env: { TZ: '${{ matrix.tz }}' }
+
+  database:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Migrations apply from scratch
+        run: npx tsx scripts/migrate.ts
+      - name: Integration, property and IDOR suites
+        run: npx vitest run tests/integration tests/property tests/idor
+      - name: Traceability (URD §21 ratchet)
+        run: npm run check:traceability
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [quality, unit, database]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npm run build
+      - run: npm run check:bundle
+      - run: npx playwright test
+        env: { CI: 'true', E2E_WEBKIT: '1' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: playwright-report, path: playwright-report }
+
+  lighthouse:
+    runs-on: ubuntu-latest
+    needs: [e2e]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run build
+      - run: npx tsx scripts/e2e-server.ts &
+      - run: npx wait-on http://localhost:3100/api/health --timeout 120000
+      - run: npx lhci autorun

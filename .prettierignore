@@ -1,0 +1,7 @@
+.next
+node_modules
+public/sw.js
+src/server/db/migrations
+docs
+*.md
+package-lock.json
