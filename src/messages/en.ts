@@ -326,8 +326,14 @@ export const msg = {
     title: () => 'Sign in',
     email: () => 'Email',
     password: () => 'Password',
+    name: () => 'Name',
     submit: () => 'Sign in',
     generic: () => 'Email or password is incorrect.',
+    registerTitle: () => 'Create account',
+    registerSubmit: () => 'Create account',
+    needAccount: () => 'Create an account',
+    haveAccount: () => 'Already have an account? Sign in',
+    passwordHint: () => 'At least 10 characters.',
   },
 
   data: {

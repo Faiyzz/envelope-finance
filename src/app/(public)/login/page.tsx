@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
+import Link from 'next/link';
 import { loginAction } from './actions';
 import { msg } from '@/messages/en';
 
@@ -21,6 +22,7 @@ export default function LoginPage() {
         <p role="alert" aria-live="polite" className="min-h-5 text-sm text-destructive">{state?.error}</p>
         <button type="submit" disabled={pending} className="btn-primary">{pending ? msg.general.loading() : msg.auth.submit()}</button>
       </form>
+      <Link href="/register" className="text-center text-sm font-medium text-primary">{msg.auth.needAccount()}</Link>
     </main>
   );
 }

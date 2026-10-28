@@ -22,14 +22,14 @@ const DEFAULT_CATEGORIES = {
     { name: 'Daily Items', group: 'home' },
     { name: 'Eggs', group: 'home' },
     { name: 'Vegetables', group: 'home' },
-    { name: 'Other (Home)', group: 'home', isSystem: true },
+    { name: 'Other (Home)', group: 'home' },
     { name: 'Food', group: 'personal' },
     { name: 'Fuel', group: 'personal' },
     { name: 'Shopping', group: 'personal' },
     { name: 'Entertainment', group: 'personal' },
     { name: 'Transport', group: 'personal' },
     { name: 'Health', group: 'personal' },
-    { name: 'Other (Personal)', group: 'personal', isSystem: true },
+    { name: 'Other (Personal)', group: 'personal' },
     { name: 'Uncategorized', group: null, isSystem: true },
   ],
   income: [
@@ -50,6 +50,7 @@ export async function seedDefaultCategories(userId: string, pool: any): Promise<
 
   try {
     await client.query('BEGIN');
+    await client.query("SELECT set_config('app.user_id', $1, true)", [userId]);
 
     for (const kind of ['expense', 'income'] as const) {
       const list: ReadonlyArray<{ name: string; group: string | null; isSystem?: boolean }> = DEFAULT_CATEGORIES[kind];
